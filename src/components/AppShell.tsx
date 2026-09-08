@@ -34,7 +34,7 @@ const NAV: NavItem[] = [
   { to: "/approvals", label: "ตรวจสอบ / อนุมัติ", icon: CheckCircle2, permission: "approve_kpi" },
   { to: "/reports", label: "รายงาน", icon: BarChart3, permission: "view_reports" },
   { to: "/master", label: "ข้อมูลหลัก", icon: Database, permission: "manage_master" },
-  { to: "/users", label: "ผู้ใช้งานและสิทธิ์", icon: Users, permission: "manage_users" },
+  { to: "/admin", label: "Admin", icon: Users, permission: "manage_users" },
   { to: "/audit", label: "ประวัติการใช้งาน", icon: ScrollText, permission: "view_audit" },
 ];
 
@@ -65,7 +65,7 @@ export function AppShell({
   }
 
   const sidebar = (
-    <div className="group flex h-full w-16 flex-col transition-all duration-300 ease-in-out hover:w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <div className="group flex h-screen w-16 flex-col transition-all duration-300 ease-in-out hover:w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="flex items-center gap-3 overflow-hidden border-b border-sidebar-border px-5 py-5">
         <Factory className="h-6 w-6 rounded-md bg-sidebar-primary/10 p-1 text-sidebar-primary" />
         <div className="min-w-0 whitespace-nowrap opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover:opacity-100">
@@ -119,14 +119,14 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="no-print hidden md:block">{sidebar}</aside>
+      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden md:block">{sidebar}</aside>
       {open && (
         <div className="no-print fixed inset-0 z-40 flex md:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
           <div className="relative z-50">{sidebar}</div>
         </div>
       )}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col md:pl-16">
         <header className="no-print flex flex-wrap items-center gap-3 border-b bg-card px-4 py-4 md:px-8">
           <Button
             variant="ghost"

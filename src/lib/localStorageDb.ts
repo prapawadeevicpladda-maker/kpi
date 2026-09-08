@@ -376,7 +376,7 @@ function seedDb(): LocalDb {
   ];
   const admin: Profile = {
     id: "user-admin",
-    full_name: "ผู้ดูแลระบบ",
+    full_name: "ประภาวดี เวตะนัต",
     email: "admin@example.com",
     employee_code: null,
     department: "ฝ่ายผลิต",
@@ -455,6 +455,29 @@ function seedDb(): LocalDb {
   };
 }
 
+function ensureAdminProfile(db: LocalDb): LocalDb {
+  let admin = db.profiles.find((profile) => profile.id === "user-admin");
+  if (!admin) {
+    admin = {
+      id: "user-admin",
+      full_name: "ประภาวดี เวตะนัต",
+      email: "admin@example.com",
+      employee_code: null,
+      department: "ฝ่ายผลิต",
+      is_active: true,
+      created_at: now(),
+      password: "password",
+    };
+    db.profiles.unshift(admin);
+  } else {
+    admin.full_name = "ประภาวดี เวตะนัต";
+    admin.is_active = true;
+  }
+  if (!db.user_roles.some((role) => role.user_id === admin.id && role.role === "admin")) {
+    db.user_roles.push({ id: id("role"), user_id: admin.id, role: "admin" });
+  }
+  return db;
+}
 function ensureMedicineFields(db: LocalDb): LocalDb {
   db.kpi_records = db.kpi_records.map((record) => ({
     ...record,
@@ -471,7 +494,9 @@ function readDb(): LocalDb {
   if (!store) return seedDb();
   const raw = store.getItem(DB_KEY);
   if (raw) {
-    const db = ensureMedicineFields(ensureProductionLines(JSON.parse(raw) as LocalDb));
+    const db = ensureAdminProfile(
+      ensureMedicineFields(ensureProductionLines(JSON.parse(raw) as LocalDb)),
+    );
     store.setItem(DB_KEY, JSON.stringify(db));
     return db;
   }
@@ -670,6 +695,53 @@ export const localDb = {
       detail: detail ?? null,
       created_at: now(),
     });
+    writeDb(db);
+  },
+  listUsers() {
+    const db = readDb();
+    return db.profiles.map((profile) => ({
+      id: profile.id,
+      full_name: profile.full_name,
+      email: profile.email,
+      is_active: profile.is_active,
+      roles: db.user_roles.filter((role) => role.user_id === profile.id).map((role) => role.role),
+      created_at: profile.created_at,
+    }));
+  },
+  addWebAppUser(fullName: string, email: string, password: string, role: AppRole = "operator") {
+    const db = readDb();
+    if (db.profiles.some((profile) => profile.email.toLowerCase() === email.toLowerCase())) {
+      throw new Error("อีเมลนี้มีอยู่แล้ว");
+    }
+    const profile: Profile = {
+      id: id("user"),
+      full_name: fullName,
+      email,
+      employee_code: null,
+      department: null,
+      is_active: true,
+      created_at: now(),
+      password,
+    };
+    db.profiles.push(profile);
+    db.user_roles.push({ id: id("role"), user_id: profile.id, role });
+    writeDb(db);
+    return profile.id;
+  },
+  removeWebAppUser(userId: string) {
+    if (userId === "user-admin") throw new Error("ไม่สามารถลบ Admin หลักได้");
+    const db = readDb();
+    db.profiles = db.profiles.filter((profile) => profile.id !== userId);
+    db.user_roles = db.user_roles.filter((role) => role.user_id !== userId);
+    db.audit_logs = db.audit_logs.filter((log) => log.user_id !== userId);
+    writeDb(db);
+  },
+  setWebAppUserActive(userId: string, isActive: boolean) {
+    if (userId === "user-admin" && !isActive) throw new Error("ไม่สามารถปิดใช้งาน Admin หลักได้");
+    const db = readDb();
+    const profile = db.profiles.find((item) => item.id === userId);
+    if (!profile) throw new Error("ไม่พบผู้ใช้งาน");
+    profile.is_active = isActive;
     writeDb(db);
   },
   getUserNames(ids: (string | null)[]) {
