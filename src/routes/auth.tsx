@@ -105,13 +105,15 @@ function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-secondary px-4 py-10">
+    <div className="flex min-h-screen items-center justify-center bg-sidebar px-4 py-10">
       <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center justify-center gap-2 text-primary">
+        <div className="mb-6 flex items-center justify-center gap-2 text-sidebar-primary">
           <Factory className="h-7 w-7" />
-          <span className="text-lg font-semibold">Production KPI Recording System</span>
+          <span className="text-lg font-semibold text-sidebar-foreground">
+            Production KPI Recording System
+          </span>
         </div>
-        <Card>
+        <Card className="border-sidebar-border bg-card/95 shadow-none backdrop-blur">
           <CardHeader>
             <CardTitle>เข้าใช้งานระบบ</CardTitle>
             <CardDescription>
