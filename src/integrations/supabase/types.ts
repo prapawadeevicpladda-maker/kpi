@@ -14,16 +14,506 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          detail: Json | null
+          entity: string
+          entity_id: string | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          detail?: Json | null
+          entity: string
+          entity_id?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          detail?: Json | null
+          entity?: string
+          entity_id?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      defect_types: {
+        Row: {
+          category: string | null
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          category?: string | null
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          category?: string | null
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
+      downtime_reasons: {
+        Row: {
+          category: string | null
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          category?: string | null
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          category?: string | null
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
+      kpi_defects: {
+        Row: {
+          defect_type_id: string
+          id: string
+          note: string | null
+          qty: number
+          record_id: string
+        }
+        Insert: {
+          defect_type_id: string
+          id?: string
+          note?: string | null
+          qty?: number
+          record_id: string
+        }
+        Update: {
+          defect_type_id?: string
+          id?: string
+          note?: string | null
+          qty?: number
+          record_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_defects_defect_type_id_fkey"
+            columns: ["defect_type_id"]
+            isOneToOne: false
+            referencedRelation: "defect_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_defects_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpi_downtimes: {
+        Row: {
+          id: string
+          minutes: number
+          note: string | null
+          reason_id: string
+          record_id: string
+        }
+        Insert: {
+          id?: string
+          minutes?: number
+          note?: string | null
+          reason_id: string
+          record_id: string
+        }
+        Update: {
+          id?: string
+          minutes?: number
+          note?: string | null
+          reason_id?: string
+          record_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_downtimes_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "downtime_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_downtimes_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpi_records: {
+        Row: {
+          achievement_rate: number | null
+          actual_qty: number
+          approved_at: string | null
+          approved_by: string | null
+          availability: number | null
+          created_at: string
+          created_by: string | null
+          cycle_time_sec: number | null
+          defect_qty: number
+          defect_rate: number | null
+          downtime_minutes: number
+          good_qty: number
+          id: string
+          line_id: string
+          machine_id: string | null
+          manpower: number
+          planned_minutes: number
+          prod_date: string
+          product_id: string | null
+          quality_rate: number | null
+          raw_material_qty: number | null
+          reject_reason: string | null
+          remark: string | null
+          rework_qty: number
+          scrap_qty: number
+          shift_id: string
+          status: Database["public"]["Enums"]["kpi_status"]
+          submitted_at: string | null
+          target_qty: number
+          updated_at: string
+          work_order: string | null
+          yield_rate: number | null
+        }
+        Insert: {
+          achievement_rate?: number | null
+          actual_qty?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          availability?: number | null
+          created_at?: string
+          created_by?: string | null
+          cycle_time_sec?: number | null
+          defect_qty?: number
+          defect_rate?: number | null
+          downtime_minutes?: number
+          good_qty?: number
+          id?: string
+          line_id: string
+          machine_id?: string | null
+          manpower?: number
+          planned_minutes?: number
+          prod_date: string
+          product_id?: string | null
+          quality_rate?: number | null
+          raw_material_qty?: number | null
+          reject_reason?: string | null
+          remark?: string | null
+          rework_qty?: number
+          scrap_qty?: number
+          shift_id: string
+          status?: Database["public"]["Enums"]["kpi_status"]
+          submitted_at?: string | null
+          target_qty?: number
+          updated_at?: string
+          work_order?: string | null
+          yield_rate?: number | null
+        }
+        Update: {
+          achievement_rate?: number | null
+          actual_qty?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          availability?: number | null
+          created_at?: string
+          created_by?: string | null
+          cycle_time_sec?: number | null
+          defect_qty?: number
+          defect_rate?: number | null
+          downtime_minutes?: number
+          good_qty?: number
+          id?: string
+          line_id?: string
+          machine_id?: string | null
+          manpower?: number
+          planned_minutes?: number
+          prod_date?: string
+          product_id?: string | null
+          quality_rate?: number | null
+          raw_material_qty?: number | null
+          reject_reason?: string | null
+          remark?: string | null
+          rework_qty?: number
+          scrap_qty?: number
+          shift_id?: string
+          status?: Database["public"]["Enums"]["kpi_status"]
+          submitted_at?: string | null
+          target_qty?: number
+          updated_at?: string
+          work_order?: string | null
+          yield_rate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_records_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "production_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_records_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_records_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_records_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machines: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          line_id: string | null
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          line_id?: string | null
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          line_id?: string | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machines_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "production_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_lines: {
+        Row: {
+          code: string
+          created_at: string
+          department: string | null
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          department?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          department?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          standard_cycle_time_sec: number | null
+          unit: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          standard_cycle_time_sec?: number | null
+          unit?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          standard_cycle_time_sec?: number | null
+          unit?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          department: string | null
+          email: string | null
+          employee_code: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          employee_code?: string | null
+          full_name?: string
+          id: string
+          is_active?: boolean
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          employee_code?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+        }
+        Relationships: []
+      }
+      shifts: {
+        Row: {
+          code: string
+          created_at: string
+          end_time: string | null
+          id: string
+          is_active: boolean
+          name: string
+          planned_minutes: number
+          start_time: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          planned_minutes?: number
+          start_time?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          planned_minutes?: number
+          start_time?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_any_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "operator"
+        | "line_leader"
+        | "supervisor"
+        | "manager"
+        | "qa"
+        | "maintenance"
+        | "admin"
+        | "management"
+      kpi_status: "draft" | "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +640,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "operator",
+        "line_leader",
+        "supervisor",
+        "manager",
+        "qa",
+        "maintenance",
+        "admin",
+        "management",
+      ],
+      kpi_status: ["draft", "pending", "approved", "rejected"],
+    },
   },
 } as const
