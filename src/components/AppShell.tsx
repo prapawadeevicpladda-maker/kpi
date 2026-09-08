@@ -14,7 +14,7 @@ import {
   Menu,
   Factory,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { localDb } from "@/lib/localStorageDb";
 import { useAuth } from "@/hooks/useAuth";
 import { can, ROLE_LABELS, type Permission } from "@/lib/kpi";
 import { cn } from "@/lib/utils";
@@ -60,20 +60,20 @@ export function AppShell({
   async function signOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
-    await supabase.auth.signOut();
+    localDb.signOut();
     navigate({ to: "/auth", replace: true });
   }
 
   const sidebar = (
-    <div className="flex h-full w-64 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex items-center gap-2 border-b border-sidebar-border px-5 py-4">
-        <Factory className="h-6 w-6 text-sidebar-primary" />
-        <div>
+    <div className="group flex h-full w-16 flex-col transition-all duration-300 ease-in-out hover:w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+      <div className="flex items-center gap-3 overflow-hidden border-b border-sidebar-border px-5 py-5">
+        <Factory className="h-6 w-6 rounded-md bg-sidebar-primary/10 p-1 text-sidebar-primary" />
+        <div className="min-w-0 whitespace-nowrap opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover:opacity-100">
           <p className="text-sm font-semibold leading-tight">Production KPI</p>
           <p className="text-[11px] text-sidebar-foreground/60">ระบบบันทึก KPI ฝ่ายผลิต</p>
         </div>
       </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+      <nav className="flex-1 space-y-1.5 overflow-y-auto p-3">
         {items.map((item) => {
           const active = item.to === "/kpi" ? pathname === "/kpi" : pathname.startsWith(item.to);
           return (
@@ -82,29 +82,36 @@ export function AppShell({
               to={item.to}
               onClick={() => setOpen(false)}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                "flex items-center gap-3 overflow-hidden rounded-md border-l-3 border-transparent px-3 py-3 text-sm transition-colors",
                 active
-                  ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60",
+                  ? "border-sidebar-primary bg-sidebar-accent font-medium text-sidebar-accent-foreground "
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
               )}
             >
-              <item.icon className="h-4 w-4" />
-              {item.label}
+              <item.icon className="h-4 w-4 shrink-0" />
+              <span className="whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                {item.label}
+              </span>
             </Link>
           );
         })}
       </nav>
-      <div className="border-t border-sidebar-border p-3">
-        <p className="truncate text-sm font-medium">{fullName}</p>
-        <p className="truncate text-[11px] text-sidebar-foreground/60">{email}</p>
-        <p className="mt-1 text-[11px] text-sidebar-primary">
-          {roles.map((r) => ROLE_LABELS[r]).join(", ") || "ยังไม่กำหนดสิทธิ์"}
-        </p>
+      <div className="overflow-hidden border-t border-sidebar-border p-3">
+        <div className="whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <p className="truncate text-sm font-medium">{fullName}</p>
+          <p className="truncate text-[11px] text-sidebar-foreground/60">{email}</p>
+          <p className="mt-1 text-[11px] text-sidebar-primary">
+            {roles.map((r) => ROLE_LABELS[r]).join(", ") || "ยังไม่กำหนดสิทธิ์"}
+          </p>
+        </div>
         <button
           onClick={signOut}
-          className="mt-3 flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm text-sidebar-foreground/75 hover:bg-sidebar-accent/60"
+          className="mt-3 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent/60"
         >
-          <LogOut className="h-4 w-4" /> ออกจากระบบ
+          <LogOut className="h-4 w-4 shrink-0" />{" "}
+          <span className="whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+            ออกจากระบบ
+          </span>
         </button>
       </div>
     </div>

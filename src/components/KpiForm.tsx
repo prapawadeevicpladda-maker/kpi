@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { localDb } from "@/lib/localStorageDb";
 import { useMasterData, type KpiRow } from "@/hooks/useMasterData";
 import { logAudit } from "@/hooks/useAuth";
 import { calcKpi, fmtPct, toISODate } from "@/lib/kpi";
@@ -43,6 +43,11 @@ export function KpiForm({
 
   const [form, setForm] = useState({
     prod_date: initial?.prod_date ?? toISODate(new Date()),
+    medicine_name: initial?.medicine_name ?? "",
+    batch_no: initial?.batch_no ?? "",
+    manufacturing_date: initial?.manufacturing_date ?? toISODate(new Date()),
+    output_kgs: initial?.output_kgs != null ? String(initial.output_kgs) : "",
+    ai_percent: initial?.ai_percent != null ? String(initial.ai_percent) : "",
     shift_id: initial?.shift_id ?? "",
     line_id: initial?.line_id ?? "",
     machine_id: initial?.machine_id ?? "",
@@ -88,6 +93,13 @@ export function KpiForm({
 
   function validate(): string | null {
     if (!form.prod_date) return "กรุณาเลือกวันที่ผลิต";
+    if (!form.medicine_name.trim()) return "กรุณากรอกชื่อยา";
+    if (!form.batch_no.trim()) return "กรุณากรอกเลขแบช";
+    if (!form.manufacturing_date) return "กรุณาเลือกวันที่ผลิตยา";
+    if (form.output_kgs === "" || num(form.output_kgs) < 0)
+      return "Output ต้องไม่เป็นค่าว่างหรือติดลบ";
+    if (form.ai_percent === "" || num(form.ai_percent) < 0)
+      return "ผลวิเคราะห์ %AI ต้องไม่เป็นค่าว่างหรือติดลบ";
     if (!form.shift_id) return "กรุณาเลือกกะการทำงาน";
     if (!form.line_id) return "กรุณาเลือกไลน์ผลิต";
     if (num(form.planned_minutes) <= 0) return "เวลาผลิตตามแผนต้องมากกว่า 0 นาที";
@@ -126,9 +138,14 @@ export function KpiForm({
       return;
     }
     setSaving(true);
-    const { data: userData } = await supabase.auth.getUser();
+    const userData = localDb.getCurrentUser();
     const payload = {
       prod_date: form.prod_date,
+      medicine_name: form.medicine_name.trim() || null,
+      batch_no: form.batch_no.trim() || null,
+      manufacturing_date: form.manufacturing_date || null,
+      output_kgs: form.output_kgs ? num(form.output_kgs) : null,
+      ai_percent: form.ai_percent ? num(form.ai_percent) : null,
       shift_id: form.shift_id,
       line_id: form.line_id,
       machine_id: form.machine_id || null,
@@ -152,37 +169,25 @@ export function KpiForm({
     };
 
     let recordId = initial?.id ?? "";
-    if (initial) {
-      const { error } = await supabase.from("kpi_records").update(payload).eq("id", initial.id);
-      if (error) {
-        setSaving(false);
-        toast.error(`บันทึกไม่สำเร็จ: ${error.message}`);
-        return;
-      }
-      await supabase.from("kpi_defects").delete().eq("record_id", initial.id);
-      await supabase.from("kpi_downtimes").delete().eq("record_id", initial.id);
-    } else {
-      const { data, error } = await supabase
-        .from("kpi_records")
-        .insert({ ...payload, created_by: userData.user?.id ?? null })
-        .select("id")
-        .single();
-      if (error || !data) {
-        setSaving(false);
-        toast.error(`บันทึกไม่สำเร็จ: ${error?.message ?? "ไม่ทราบสาเหตุ"}`);
-        return;
-      }
-      recordId = data.id;
+    try {
+      const dRows = defects
+        .filter((d) => d.key && num(d.qty) > 0)
+        .map((d) => ({ defect_type_id: d.key, qty: num(d.qty) }));
+      const tRows = downtimes
+        .filter((d) => d.key && num(d.qty) > 0)
+        .map((d) => ({ reason_id: d.key, minutes: num(d.qty) }));
+      recordId = localDb.saveKpiRecord(
+        initial?.id ?? null,
+        payload,
+        userData?.id ?? null,
+        dRows,
+        tRows,
+      );
+    } catch (error) {
+      setSaving(false);
+      toast.error(`บันทึกไม่สำเร็จ: ${error instanceof Error ? error.message : "ไม่ทราบสาเหตุ"}`);
+      return;
     }
-
-    const dRows = defects
-      .filter((d) => d.key && num(d.qty) > 0)
-      .map((d) => ({ record_id: recordId, defect_type_id: d.key, qty: num(d.qty) }));
-    if (dRows.length) await supabase.from("kpi_defects").insert(dRows);
-    const tRows = downtimes
-      .filter((d) => d.key && num(d.qty) > 0)
-      .map((d) => ({ record_id: recordId, reason_id: d.key, minutes: num(d.qty) }));
-    if (tRows.length) await supabase.from("kpi_downtimes").insert(tRows);
 
     await logAudit(
       initial ? (action === "submit" ? "ส่งอนุมัติ" : "แก้ไขข้อมูล") : "บันทึกข้อมูลใหม่",
@@ -216,6 +221,57 @@ export function KpiForm({
             <CardTitle className="text-base">ข้อมูลการผลิต</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="medicine_name">ชื่อยา *</Label>
+              <Input
+                id="medicine_name"
+                value={form.medicine_name}
+                onChange={(e) => set("medicine_name", e.target.value)}
+                maxLength={120}
+                placeholder="กรอกชื่อยา"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="batch_no">เลขแบช *</Label>
+              <Input
+                id="batch_no"
+                value={form.batch_no}
+                onChange={(e) => set("batch_no", e.target.value)}
+                maxLength={80}
+                placeholder="เช่น BATCH-001"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manufacturing_date">วันที่ผลิต *</Label>
+              <Input
+                id="manufacturing_date"
+                type="date"
+                value={form.manufacturing_date}
+                onChange={(e) => set("manufacturing_date", e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="output_kgs">Output (Kgs.) *</Label>
+              <Input
+                id="output_kgs"
+                type="number"
+                min={0}
+                step="any"
+                value={form.output_kgs}
+                onChange={(e) => set("output_kgs", e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ai_percent">ผลวิเคราะห์ %AI *</Label>
+              <Input
+                id="ai_percent"
+                type="number"
+                min={0}
+                step="any"
+                value={form.ai_percent}
+                onChange={(e) => set("ai_percent", e.target.value)}
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="prod_date">วันที่ผลิต *</Label>
               <Input
@@ -396,7 +452,10 @@ export function KpiForm({
               ["Yield", fmtPct(calc.yield_rate)],
               ["เวลาเดินเครื่อง (นาที)", String(calc.run_minutes)],
             ].map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between border-b pb-2 last:border-0">
+              <div
+                key={k}
+                className="flex items-center justify-between border-b pb-2 last:border-0"
+              >
                 <span className="text-muted-foreground">{k}</span>
                 <span className="font-semibold">{v}</span>
               </div>

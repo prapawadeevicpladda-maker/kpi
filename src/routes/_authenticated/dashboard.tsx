@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -16,15 +16,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlertTriangle, TrendingUp } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { AlertTriangle, CalendarIcon, TrendingUp } from "lucide-react";
+import { localDb } from "@/lib/localStorageDb";
 import { AppShell } from "@/components/AppShell";
-import { KPI_SELECT, useMasterData, type KpiRow } from "@/hooks/useMasterData";
+import { useMasterData, type KpiRow } from "@/hooks/useMasterData";
 import { calcKpi, fmtNum, fmtPct, STATUS_CLASS, STATUS_LABELS, toISODate } from "@/lib/kpi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -50,6 +52,38 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 const ALL = "__all__";
 
+function parseISODate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return undefined;
+  return new Date(year, month - 1, day);
+}
+
+function DatePicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="w-full justify-start text-left font-normal">
+          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+          {value
+            ? parseISODate(value)?.toLocaleDateString("th-TH", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })
+            : "เลือกวันที่"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={parseISODate(value)}
+          onSelect={(date) => date && onChange(toISODate(date))}
+          captionLayout="dropdown"
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 function DashboardPage() {
   const { data: master } = useMasterData();
   const today = new Date();
@@ -65,64 +99,33 @@ function DashboardPage() {
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["dashboard-kpi", from, to, shift, line, product],
     queryFn: async () => {
-      let q = supabase
-        .from("kpi_records")
-        .select(KPI_SELECT)
-        .gte("prod_date", from)
-        .lte("prod_date", to)
-        .order("prod_date", { ascending: true });
-      if (shift !== ALL) q = q.eq("shift_id", shift);
-      if (line !== ALL) q = q.eq("line_id", line);
-      if (product !== ALL) q = q.eq("product_id", product);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as unknown as KpiRow[];
+      const filters: { from: string; to: string; shift?: string; line?: string; product?: string } =
+        {
+          from,
+          to,
+        };
+      if (shift !== ALL) filters.shift = shift;
+      if (line !== ALL) filters.line = line;
+      if (product !== ALL) filters.product = product;
+      return localDb.getKpiRecords(filters) as KpiRow[];
     },
   });
 
   const { data: downtimeByReason = [] } = useQuery({
     queryKey: ["dashboard-downtime", from, to, line],
     queryFn: async () => {
-      let q = supabase
-        .from("kpi_downtimes")
-        .select("minutes, downtime_reasons(name), kpi_records!inner(prod_date, line_id)")
-        .gte("kpi_records.prod_date", from)
-        .lte("kpi_records.prod_date", to);
-      if (line !== ALL) q = q.eq("kpi_records.line_id", line);
-      const { data, error } = await q;
-      if (error) throw error;
-      const map = new Map<string, number>();
-      for (const row of (data ?? []) as unknown as {
-        minutes: number;
-        downtime_reasons: { name: string } | null;
-      }[]) {
-        const name = row.downtime_reasons?.name ?? "ไม่ระบุ";
-        map.set(name, (map.get(name) ?? 0) + Number(row.minutes));
-      }
-      return Array.from(map, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+      const filters: { from: string; to: string; line?: string } = { from, to };
+      if (line !== ALL) filters.line = line;
+      return localDb.getDowntimeByReason(filters);
     },
   });
 
   const { data: defectByType = [] } = useQuery({
     queryKey: ["dashboard-defects", from, to, line],
     queryFn: async () => {
-      let q = supabase
-        .from("kpi_defects")
-        .select("qty, defect_types(name), kpi_records!inner(prod_date, line_id)")
-        .gte("kpi_records.prod_date", from)
-        .lte("kpi_records.prod_date", to);
-      if (line !== ALL) q = q.eq("kpi_records.line_id", line);
-      const { data, error } = await q;
-      if (error) throw error;
-      const map = new Map<string, number>();
-      for (const row of (data ?? []) as unknown as {
-        qty: number;
-        defect_types: { name: string } | null;
-      }[]) {
-        const name = row.defect_types?.name ?? "ไม่ระบุ";
-        map.set(name, (map.get(name) ?? 0) + Number(row.qty));
-      }
-      return Array.from(map, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+      const filters: { from: string; to: string; line?: string } = { from, to };
+      if (line !== ALL) filters.line = line;
+      return localDb.getDefectByType(filters);
     },
   });
 
@@ -210,21 +213,16 @@ function DashboardPage() {
     <AppShell
       title="แดชบอร์ด KPI การผลิต"
       description="สรุปผลการผลิตตามช่วงวันที่ กะ ไลน์ผลิต และผลิตภัณฑ์"
-      actions={
-        <Button asChild variant="outline" size="sm">
-          <Link to="/reports">ไปที่รายงาน</Link>
-        </Button>
-      }
     >
       <Card className="mb-6">
         <CardContent className="grid gap-4 pt-6 md:grid-cols-5">
           <div className="space-y-2">
             <Label>ตั้งแต่วันที่</Label>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <DatePicker value={from} onChange={setFrom} />
           </div>
           <div className="space-y-2">
             <Label>ถึงวันที่</Label>
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            <DatePicker value={to} onChange={setTo} />
           </div>
           <div className="space-y-2">
             <Label>กะ</Label>
@@ -278,13 +276,21 @@ function DashboardPage() {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Stat title="Achievement Rate" value={fmtPct(summary.calc.achievement_rate)} tone="primary" />
+        <Stat
+          title="Achievement Rate"
+          value={fmtPct(summary.calc.achievement_rate)}
+          tone="primary"
+        />
         <Stat title="Quality Rate" value={fmtPct(summary.calc.quality_rate)} tone="success" />
         <Stat title="OEE" value={fmtPct(summary.calc.oee)} tone="primary" />
         <Stat title="Defect Rate" value={fmtPct(summary.calc.defect_rate)} tone="destructive" />
         <Stat title="ผลิตจริงรวม" value={fmtNum(summary.totals.actual)} />
         <Stat title="เป้าหมายรวม" value={fmtNum(summary.totals.target)} />
-        <Stat title="Downtime รวม (นาที)" value={fmtNum(summary.totals.downtime)} tone="destructive" />
+        <Stat
+          title="Downtime รวม (นาที)"
+          value={fmtNum(summary.totals.downtime)}
+          tone="destructive"
+        />
         <Stat title="Availability" value={fmtPct(summary.calc.availability)} tone="success" />
       </div>
 
@@ -343,7 +349,13 @@ function DashboardPage() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={downtimeByReason} dataKey="value" nameKey="name" outerRadius={90} label>
+                  <Pie
+                    data={downtimeByReason}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={90}
+                    label
+                  >
                     {downtimeByReason.map((_, i) => (
                       <Cell key={i} fill={chartColors[i % chartColors.length]} />
                     ))}
@@ -425,15 +437,7 @@ function DashboardPage() {
                 .slice(0, 10)
                 .map((r) => (
                   <tr key={r.id} className="border-b last:border-0">
-                    <td className="py-2">
-                      <Link
-                        to="/kpi/$id"
-                        params={{ id: r.id }}
-                        className="text-primary hover:underline"
-                      >
-                        {r.prod_date}
-                      </Link>
-                    </td>
+                    <td className="py-2">{r.prod_date}</td>
                     <td className="py-2">{r.shifts?.code}</td>
                     <td className="py-2">{r.production_lines?.name}</td>
                     <td className="py-2 text-right">{fmtNum(r.target_qty)}</td>

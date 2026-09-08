@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Factory, Loader2 } from "lucide-react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import { localDb } from "@/lib/localStorageDb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,10 +43,8 @@ function AuthPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/dashboard", replace: true });
-      else setChecking(false);
-    });
+    if (localDb.getCurrentUser()) navigate({ to: "/dashboard", replace: true });
+    else setChecking(false);
   }, [navigate]);
 
   async function afterAuth() {
@@ -57,33 +54,19 @@ function AuthPage() {
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = z.object({ email: emailSchema, password: passwordSchema }).safeParse({
-      email,
-      password,
-    });
+    const parsed = z
+      .object({ email: emailSchema, password: passwordSchema })
+      .safeParse({ email, password });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]!.message);
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword(parsed.data);
+    const { error } = localDb.signIn(parsed.data.email, parsed.data.password);
     setLoading(false);
     if (error) {
       toast.error("เข้าสู่ระบบไม่สำเร็จ: อีเมลหรือรหัสผ่านไม่ถูกต้อง");
       return;
-    }
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_active")
-        .eq("id", data.user.id)
-        .maybeSingle();
-      if (profile && profile.is_active === false) {
-        await supabase.auth.signOut();
-        toast.error("บัญชีนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ");
-        return;
-      }
     }
     toast.success("เข้าสู่ระบบสำเร็จ");
     await afterAuth();
@@ -103,38 +86,13 @@ function AuthPage() {
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({
-      email: parsed.data.email,
-      password: parsed.data.password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: { full_name: parsed.data.fullName },
-      },
-    });
+    const { error } = localDb.signUp(parsed.data.email, parsed.data.password, parsed.data.fullName);
     setLoading(false);
     if (error) {
-      toast.error(`สมัครใช้งานไม่สำเร็จ: ${error.message}`);
-      return;
-    }
-    if (!data.session) {
-      toast.success("สมัครใช้งานสำเร็จ กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ");
+      toast.error(`สมัครใช้งานไม่สำเร็จ: ${error}`);
       return;
     }
     toast.success("สมัครใช้งานสำเร็จ");
-    await afterAuth();
-  }
-
-  async function googleSignIn() {
-    setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
-      setLoading(false);
-      toast.error("เข้าสู่ระบบด้วย Google ไม่สำเร็จ");
-      return;
-    }
-    if (result.redirected) return;
     await afterAuth();
   }
 
@@ -157,7 +115,7 @@ function AuthPage() {
           <CardHeader>
             <CardTitle>เข้าใช้งานระบบ</CardTitle>
             <CardDescription>
-              ระบบบันทึก ตรวจสอบ และอนุมัติ KPI การผลิต สำหรับฝ่ายผลิตและหน่วยงานที่เกี่ยวข้อง
+              ข้อมูลบัญชีและ KPI จะถูกเก็บใน local storage ของ browser เครื่องนี้
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -175,7 +133,7 @@ function AuthPage() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@company.com"
+                      placeholder="admin@example.com"
                       autoComplete="email"
                     />
                   </div>
@@ -186,12 +144,12 @@ function AuthPage() {
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      placeholder="password"
                       autoComplete="current-password"
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    เข้าสู่ระบบ
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}เข้าสู่ระบบ
                   </Button>
                 </form>
               </TabsContent>
@@ -227,30 +185,15 @@ function AuthPage() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    ผู้ใช้งานใหม่จะได้สิทธิ์ Operator โดยค่าเริ่มต้น
-                    ผู้ดูแลระบบสามารถปรับสิทธิ์ให้ภายหลังได้ (ผู้ใช้คนแรกของระบบจะเป็น Admin)
+                    ผู้ใช้งานใหม่จะได้สิทธิ์ Operator โดยค่าเริ่มต้น บัญชี demo: admin@example.com /
+                    password
                   </p>
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    สมัครใช้งาน
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}สมัครใช้งาน
                   </Button>
                 </form>
               </TabsContent>
             </Tabs>
-            <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-xs text-muted-foreground">หรือ</span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={googleSignIn}
-              disabled={loading}
-            >
-              เข้าสู่ระบบด้วย Google
-            </Button>
           </CardContent>
         </Card>
         <p className="mt-6 text-center text-sm text-muted-foreground">

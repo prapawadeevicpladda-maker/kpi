@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { localDb } from "@/lib/localStorageDb";
 import type { AppRole } from "@/lib/kpi";
 
 export type AuthState = {
@@ -14,22 +14,7 @@ export type AuthState = {
 export function useAuth(): AuthState {
   const { data, isLoading } = useQuery({
     queryKey: ["auth-state"],
-    queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
-      if (!user) return null;
-      const [{ data: profile }, { data: roleRows }] = await Promise.all([
-        supabase.from("profiles").select("full_name, is_active").eq("id", user.id).maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", user.id),
-      ]);
-      return {
-        userId: user.id,
-        email: user.email ?? null,
-        fullName: profile?.full_name || user.email || "ผู้ใช้งาน",
-        isActive: profile?.is_active ?? true,
-        roles: (roleRows ?? []).map((r) => r.role as AppRole),
-      };
-    },
+    queryFn: async () => localDb.getAuthState(),
     staleTime: 60_000,
   });
 
@@ -49,13 +34,5 @@ export async function logAudit(
   entityId?: string | null,
   detail?: Record<string, unknown>,
 ) {
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) return;
-  await supabase.from("audit_logs").insert({
-    user_id: data.user.id,
-    action,
-    entity,
-    entity_id: entityId ?? null,
-    detail: detail ?? null,
-  });
+  localDb.addAudit(action, entity, entityId, detail);
 }
